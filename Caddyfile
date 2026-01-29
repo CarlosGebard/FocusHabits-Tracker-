@@ -1,0 +1,16 @@
+{$DOMAIN:localhost} {
+  encode zstd gzip
+
+  @api path /api/*
+  reverse_proxy @api api:8000
+  reverse_proxy web:4173
+  root * /srv/web
+  file_server
+
+  # opcional recomendado: SPA fallback (React/Vue/etc.)
+  try_files {path} /index.html
+}
+
+www.{$DOMAIN:localhost} {
+  redir https://{$DOMAIN:localhost}{uri}
+}
