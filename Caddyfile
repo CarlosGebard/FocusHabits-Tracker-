@@ -1,4 +1,5 @@
-{$DOMAIN:localhost} {
+# Caddyfile de desarrollo , no usar en produccion
+:80 {
   encode zstd gzip
 
   @api path /api/*
@@ -7,10 +8,7 @@
   root * /srv/web
   file_server
 
-  # opcional recomendado: SPA fallback (React/Vue/etc.)
   try_files {path} /index.html
 }
 
-www.{$DOMAIN:localhost} {
-  redir https://{$DOMAIN:localhost}{uri}
-}
+ 

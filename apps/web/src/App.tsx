@@ -8,8 +8,8 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { FocusView } from "./components/FocusView";
 import { NowPlayingView } from "./components/NowPlayingView";
 import { PlaylistsView } from "./components/PlaylistsView";
-import { SettingsPanel } from "./components/SettingsPanel";
 import { MiniPlayer } from "./components/MiniPlayer";
+import { Sidebar } from "./components/Sidebar";
 import {
   getPlaybackState,
   getPlaylist,
@@ -50,6 +50,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -300,19 +301,24 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <AppHeader tabs={TABS} activeTab={tab} onTabChange={setTab} />
+      <AppHeader
+        currentView={tab}
+        currentUser={currentUser}
+        status={status}
+        onLogout={handleLogout}
+        onOpenSidebar={() => setSidebarOpen(true)}
+      />
+
+      <Sidebar
+        tabs={TABS}
+        activeTab={tab}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onSelect={setTab}
+      />
 
       <main className="chat-body">
         <div className="chat-main">
-          <SettingsPanel
-            currentUser={currentUser}
-            status={status}
-            onLogout={handleLogout}
-            onRefresh={loadData}
-            onScan={() => api.scanTracks().then(loadData)}
-            onRepairDownloads={repairDownloads}
-          />
-
           {tab === "Library" && (
             <LibraryView
               tracks={tracks}
@@ -321,6 +327,9 @@ export default function App() {
                 const downloaded = await isTrackDownloaded(trackId);
                 setStatus(downloaded ? "Already downloaded" : "Use playlist download");
               }}
+              onRefresh={loadData}
+              onScan={() => api.scanTracks().then(loadData)}
+              onRepairDownloads={repairDownloads}
             />
           )}
 

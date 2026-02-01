@@ -26,7 +26,7 @@ export function AuthScreen({
           <div className="chat-title-row">
             <div>
               <div className="chat-title">Personal App</div>
-              <div className="chat-subtitle">Personal audio library</div>
+              <div className="chat-subtitle">Multi Purpose Personal App</div>
             </div>
             <div className="status-pill">Offline ready</div>
           </div>

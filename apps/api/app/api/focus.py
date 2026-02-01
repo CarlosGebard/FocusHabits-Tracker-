@@ -18,6 +18,34 @@ router = APIRouter(prefix="/api/focus", tags=["focus"], dependencies=[Depends(ge
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
+def _elapsed_seconds(session: FocusSession, now: datetime) -> int:
+    started = session.started_at
+    effective_now = now
+    if session.status == "paused" and session.paused_at:
+        effective_now = session.paused_at
+    paused_seconds = session.paused_seconds or 0
+    elapsed = int((effective_now - started).total_seconds()) - paused_seconds
+    return max(0, elapsed)
+
+
+def _is_expired(session: FocusSession, now: datetime) -> bool:
+    return _elapsed_seconds(session, now) >= session.duration_seconds
+
+
+def _complete_expired_session(db: Session, session: FocusSession, now: datetime) -> bool:
+    if session.status in {"completed", "canceled"}:
+        return False
+    if not _is_expired(session, now):
+        return False
+    if session.paused_at:
+        delta = now - session.paused_at
+        session.paused_seconds += int(delta.total_seconds())
+        session.paused_at = None
+    session.status = "completed"
+    session.ended_at = now
+    db.commit()
+    db.refresh(session)
+    return True
 
 def _active_session(db: Session, user_id: int) -> FocusSession | None:
     return (
@@ -45,7 +73,9 @@ def start_focus(payload: FocusStartIn, db: Session = Depends(get_db), user: User
 
     existing = _active_session(db, user.id)
     if existing:
-        raise HTTPException(status_code=HTTP_409_CONFLICT, detail="Active session exists")
+        now = _utcnow()
+        if not _complete_expired_session(db, existing, now):
+            raise HTTPException(status_code=HTTP_409_CONFLICT, detail="Active session exists")
 
     now = _utcnow()
     session = FocusSession(
@@ -126,6 +156,8 @@ def complete_focus(session_id: int, db: Session = Depends(get_db), user: User = 
 def active_focus(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     session = _active_session(db, user.id)
     if not session:
+        return Response(status_code=204)
+    if _complete_expired_session(db, session, _utcnow()):
         return Response(status_code=204)
     return session
 

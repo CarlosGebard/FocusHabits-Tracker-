@@ -49,6 +49,9 @@ export function FocusView({ onStatus }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const tickingRef = useRef<number | null>(null);
+  const pollRef = useRef<number | null>(null);
+  const pollInFlightRef = useRef(false);
+  const hadActiveRef = useRef(false);
   const completingRef = useRef(false);
   const dialProgress = (selectedMinutes - MIN_MINUTES) / (MAX_MINUTES - MIN_MINUTES);
   // Keep the knob aligned with the progress stroke (full 360deg sweep).
@@ -61,9 +64,15 @@ export function FocusView({ onStatus }: Props) {
 
   useEffect(() => {
     refresh();
+    pollRef.current = window.setInterval(() => {
+      pollActive();
+    }, 5000);
     return () => {
       if (tickingRef.current) {
         window.clearInterval(tickingRef.current);
+      }
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current);
       }
     };
   }, []);
@@ -111,12 +120,33 @@ export function FocusView({ onStatus }: Props) {
     try {
       const [active, sessions] = await Promise.all([api.focusActive(), api.focusSessions(20, 0)]);
       setActiveSession(active);
+      hadActiveRef.current = Boolean(active);
       setHistory(sessions.items);
       setHistoryTotal(sessions.total);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function pollActive() {
+    if (pollInFlightRef.current) return;
+    pollInFlightRef.current = true;
+    try {
+      const active = await api.focusActive();
+      setActiveSession(active);
+      if (active) {
+        hadActiveRef.current = true;
+      }
+      if (!active && hadActiveRef.current) {
+        hadActiveRef.current = false;
+        await refreshHistory();
+      }
+    } catch {
+      // Avoid noisy errors during background polling.
+    } finally {
+      pollInFlightRef.current = false;
     }
   }
 
@@ -135,7 +165,14 @@ export function FocusView({ onStatus }: Props) {
       onStatus("Focus session started.");
       await refreshHistory();
     } catch (err) {
-      setError((err as Error).message);
+      const message = (err as Error).message || "Failed to start focus session.";
+      if (message.includes("Active session exists")) {
+        const active = await api.focusActive();
+        setActiveSession(active);
+        onStatus("Ya hay una sesión activa en otro dispositivo.");
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }

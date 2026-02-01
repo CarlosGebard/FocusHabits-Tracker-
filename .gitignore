@@ -11,7 +11,9 @@ apps/web/node_modules
 dist
 apps/web/dist
 .vite
+package-lock.json
 
+yarn.lock
 .venv
 __pycache__
 *.py[cod]
